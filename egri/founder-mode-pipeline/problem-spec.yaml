@@ -1,0 +1,112 @@
+# Autoany Problem Spec — founder-mode-pipeline
+# Domain: personalized oncology bioinformatics
+# Target: Intel NUC (RTX 3060 12GB, 32GB RAM, 8 cores) via Tailscale SSH
+
+name: "founder-mode-pipeline"
+
+objective:
+  metric: "neoantigen_candidates_passing_structural_validation"
+  type: scalar
+  direction: maximize
+  baseline: 0  # No candidates yet — first run establishes baseline
+
+constraints:
+  - "disk_usage_gb <= 80"        # F: has 59GB free, need headroom
+  - "gpu_vram_gb <= 11"          # RTX 3060 has 12GB, leave 1GB system
+  - "runtime_per_phase_h <= 12"  # No single phase should exceed 12h
+  - "total_cost_usd <= 20"       # Cloud GPU budget if needed
+
+artifacts:
+  mutable:
+    - path: "scripts/pipeline.py"
+      type: code
+      description: "Main orchestration script — phases 1-6 of the test plan"
+    - path: "scripts/scrna_analysis.py"
+      type: code
+      description: "Scanpy scRNA-seq analysis for target discovery"
+    - path: "scripts/neoantigen_predict.py"
+      type: code
+      description: "pVACseq + MHCflurry + Vaxrank neoantigen prediction"
+    - path: "scripts/alphafold_validate.py"
+      type: code
+      description: "AlphaFold Multimer / ESMFold structural validation"
+    - path: "config.yaml"
+      type: config
+      description: "Pipeline parameters (thresholds, paths, HLA alleles)"
+  immutable:
+    - path: "test-plan.md"
+      reason: "Reference specification — do not mutate during execution"
+    - path: "public-datasets.md"
+      reason: "Data source catalog — reference only"
+    - path: "eval/run_eval.sh"
+      reason: "Evaluator must not be mutated in same trial as artifacts"
+
+evaluator:
+  script: "eval/run_eval.sh"
+  inputs:
+    - "results/neoantigens/top50_candidates.csv"
+    - "results/alphafold/structural_validation.csv"
+    - "results/scrna/differential_expression_all_clusters.csv"
+  outputs:
+    neoantigen_count: "Number of candidates passing all filters"
+    t1_count: "Number of T1 tier candidates"
+    fap_detected: "Boolean — FAP overexpression confirmed in scRNA-seq"
+    pipeline_complete: "Boolean — all 6 phases completed without error"
+  trusted: true  # Evaluator measures objective file outputs, no gaming possible
+  baseline_score: 0
+
+execution:
+  backend: ssh
+  host: "nuc-gpu"
+  workdir: "F:/founder-mode-pipeline"
+  command: "python scripts/pipeline.py --config config.yaml"
+  timeout_s: 172800  # 48 hours max
+  sandbox: false  # Running on dedicated hardware
+
+budget:
+  max_trials: 5          # Each trial is a full pipeline run (~24-48h)
+  time_per_trial_s: 172800
+  total_time_s: 604800   # 1 week max
+  token_budget: null
+  cost_budget: 20.0      # USD for cloud GPU if ESMFold/AF used remotely
+
+promotion:
+  policy: keep_if_improves
+  threshold: 1            # At least 1 candidate passing validation = success
+  require_constraint_check: true
+
+autonomy:
+  mode: sandbox           # Human reviews before promoting results
+  escalation_triggers:
+    - "phase_fails_with_error"
+    - "disk_space_below_10gb"
+    - "gpu_oom_error"
+    - "data_download_fails"
+    - "no_candidates_after_phase_4"
+
+search:
+  proposer: llm
+  strategy_notes: |
+    Trial 1: Run full pipeline with default parameters on osteosarc.com data.
+    If Phase 1 fails (data paths wrong): fall back to GSE152048 + TCGA MAFs.
+    If Phase 3 fails (no FAP in scRNA-seq): use known FAP status from literature.
+    If Phase 5 fails (GPU OOM on AF Multimer): switch to ESMFold for pre-screen.
+    Trial 2+: Adjust thresholds based on candidate counts from Trial 1.
+
+ledger:
+  format: jsonl
+  path: "./ledger.jsonl"
+
+domain:
+  preset: bioinformatics
+  notes: |
+    Personalized oncology pipeline based on founder-mode-oncology skill.
+    Data: gs://osteosarc-genomics (24.88 TiB public, using ~20GB subset).
+    Hardware: Intel NUC, RTX 3060 12GB, 32GB RAM, Windows, Python 3.11.
+    Pipeline: VEP annotation → Scanpy scRNA-seq → pVACseq → AlphaFold validation.
+
+meta:
+  created_by: "autoany_init + manual"
+  created_at: "2026-04-01"
+  version: "1.0.0"
+  parent_spec: null

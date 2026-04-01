@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Autoany Trial Ledger Entry",
+  "description": "Schema for a single trial record in an EGRI ledger.",
+  "type": "object",
+  "required": [
+    "trial_id",
+    "timestamp",
+    "parent_state",
+    "mutation",
+    "outcome",
+    "decision"
+  ],
+  "properties": {
+    "trial_id": {
+      "type": "string",
+      "description": "Unique identifier for this trial (e.g., UUID or sequential)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of trial start"
+    },
+    "parent_state": {
+      "type": "string",
+      "description": "Identifier of the artifact state this trial mutated from"
+    },
+    "mutation": {
+      "type": "object",
+      "required": ["operator", "description"],
+      "properties": {
+        "operator": {
+          "type": "string",
+          "description": "Name of the mutation operator applied"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of what was changed"
+        },
+        "diff": {
+          "type": "string",
+          "description": "Patch or diff of the change (optional but recommended)"
+        },
+        "hypothesis": {
+          "type": "string",
+          "description": "Why this mutation was proposed — the reasoning"
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "properties": {
+        "duration_s": {
+          "type": "number",
+          "description": "Wall-clock seconds for execution"
+        },
+        "resource_usage": {
+          "type": "object",
+          "description": "Memory, CPU, GPU, tokens, cost consumed",
+          "additionalProperties": true
+        },
+        "exit_code": {
+          "type": "integer"
+        },
+        "error": {
+          "type": ["string", "null"],
+          "description": "Error message if execution failed"
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "required": ["score", "constraints_passed"],
+      "properties": {
+        "score": {
+          "description": "Evaluator output — scalar number or object for vector metrics",
+          "oneOf": [
+            { "type": "number" },
+            { "type": "object", "additionalProperties": { "type": "number" } }
+          ]
+        },
+        "constraints_passed": {
+          "type": "boolean",
+          "description": "Whether all hard constraints were satisfied"
+        },
+        "constraint_violations": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of violated constraints (empty if all passed)"
+        },
+        "evaluator_metadata": {
+          "type": "object",
+          "description": "Additional evaluator output (confusion matrix, per-sample scores, etc.)",
+          "additionalProperties": true
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "required": ["action"],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["promoted", "discarded", "branched", "escalated"],
+          "description": "What happened to this candidate"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why this decision was made"
+        },
+        "new_state_id": {
+          "type": ["string", "null"],
+          "description": "Identifier of the new promoted state (null if discarded)"
+        }
+      }
+    },
+    "strategy_notes": {
+      "type": ["string", "null"],
+      "description": "Post-trial observations for strategy distillation"
+    }
+  }
+}

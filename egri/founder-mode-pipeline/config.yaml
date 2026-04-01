@@ -1,0 +1,74 @@
+# Pipeline Configuration — Founder Mode Oncology
+# Target: Intel NUC (RTX 3060 12GB, 32GB RAM, Windows)
+
+paths:
+  workdir: "F:/founder-mode-pipeline"
+  data: "F:/founder-mode-pipeline/data"
+  results: "F:/founder-mode-pipeline/results"
+  reference: "F:/founder-mode-pipeline/data/reference"
+
+data_sources:
+  # Primary: osteosarc.com pre-called data
+  variants_bucket: "gs://osteosarc-genomics/genomics_reprocessing/DNA/T2_2025_01_WGS_sarek_variants/"
+  rnaseq_bucket: "gs://osteosarc-genomics/rna-seq/"
+  scrna_bucket: "gs://osteosarc-genomics/ucsf/T1/"
+  neoantigen_bucket: "gs://osteosarc-genomics/neoantigen_prediction/"
+  # Fallback: GEO for scRNA-seq
+  scrna_fallback_geo: "GSE152048"
+  scrna_fallback_url: "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE152048&format=file"
+
+hla:
+  # Sid's HLA alleles (from osteosarc.com HLA typing)
+  # Using common alleles as defaults until confirmed from data
+  class_i:
+    - "HLA-A*02:01"
+    - "HLA-A*24:02"
+    - "HLA-B*07:02"
+    - "HLA-B*44:02"
+    - "HLA-C*07:02"
+    - "HLA-C*05:01"
+
+phase2_annotation:
+  vep_assembly: "GRCh38"
+  vep_fork: 4  # 4 threads (8 cores total, leave headroom)
+
+phase3_scrna:
+  min_genes: 200
+  min_cells: 3
+  max_mt_pct: 20
+  n_top_genes: 3000
+  leiden_resolution: 0.8
+  target_genes:
+    - "FAP"
+    - "CD276"    # B7-H3
+    - "EPHA2"
+    - "MSLN"
+    - "FOLR1"
+    - "MUC1"
+    - "ERBB2"
+    - "EGFR"
+    - "MET"
+    - "PDGFRA"
+    - "KIT"
+
+phase4_neoantigens:
+  binding_threshold: 500  # IC50 nM
+  epitope_lengths: [8, 9, 10, 11]
+  predictors: ["MHCflurry"]  # Start with MHCflurry only (fastest)
+  top_n_candidates: 50
+  min_vaf: 0.05
+  min_expression: 1.0  # TPM
+
+phase5_alphafold:
+  # ESMFold first (runs on RTX 3060), AF Multimer if budget allows
+  use_esmfold_prescreen: true
+  esmfold_api: "https://api.esmatlas.com/foldSequence/v1/pdb/"
+  use_colabfold_local: false  # RTX 3060 12GB may be tight for multimer
+  use_modal: false  # Enable if local GPU insufficient
+  iptm_threshold: 0.5
+  pae_threshold: 10
+  plddt_threshold: 85
+  max_candidates_for_af: 20  # Top 20 from ESMFold pre-screen
+
+phase6_treatment:
+  template: "TREATMENT_RECOMMENDATION.md"
