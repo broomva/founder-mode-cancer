@@ -1,0 +1,5 @@
+{"trial": 0, "phase": "setup", "timestamp": "2026-04-01T15:15:00Z", "event": "nuc_probed", "metrics": {"ram_gb": 32, "cpu_cores": 8, "gpu": "RTX 3060 12GB", "os": "Windows", "python": "3.11.3", "disk_free_f_gb": 59}}
+{"trial": 0, "phase": "setup", "timestamp": "2026-04-01T15:20:00Z", "event": "deps_installed", "metrics": {"scanpy": "1.11.5", "pandas": "2.3.3", "anndata": "0.12.10", "numpy": "1.26.4", "pyarrow": "23.0.1"}}
+{"trial": 0, "phase": "setup", "timestamp": "2026-04-01T15:25:00Z", "event": "numpy_fixed", "notes": "numpy 2.4.4 broke pyarrow/scanpy, pinned to 1.26.4"}
+{"trial": 1, "phase": "phase1_acquire", "timestamp": "2026-04-01T15:30:00Z", "event": "download_started", "files_targeted": 10, "notes": "Using HTTP instead of gsutil (gsutil auth broken on NUC)"}
+{"trial": 1, "phase": "phase1_acquire", "timestamp": "2026-04-01T15:50:00Z", "event": "download_progress", "metrics": {"files_ok": 8, "files_failed": 1, "files_downloading": 1, "total_downloaded_mb": 1294}, "notes": "T1 VCF 404 (path differs). T2 VCF (150MB) + neoantigen predictions + RNA-seq + scRNA-seq raw matrix (209MB) all OK. Seurat RDS (969MB) downloading."}
